@@ -91,15 +91,16 @@ showMaterials mats = Text.unlines $ concatMap (showTree 0) mats
 -- note: this match any package, how to filter std build env?
 defaultIgnore :: Set Text
 defaultIgnore =
-    Set.fromList $ mconcat [stdenv, glib, gnu, libs, comp, utils, build, rust, haskell]
+    Set.fromList $ mconcat [stdenv, glib, gnu, libs, tools, comp, utils, build, rust, haskell]
   where
-    stdenv = ["gcc", "xgcc", "linux-headers", "glibc", "coreutils", "binutils", "patch", "patchelf", "gmp"]
+    stdenv = ["gcc", "xgcc", "clang", "llvm", "compiler-rt-libc", "linux-headers", "glibc", "coreutils", "binutils", "patch", "patchelf", "gmp"]
     glib = ["glibc", "glibc-locales"]
-    gnu = ["gnutar", "gnumake", "gnugrep", "gawk"]
-    libs = ["pcre2", "mpfr", "pcre-light"]
-    comp = ["gzip", "zlib", "bzip2", "xz"]
-    utils = ["rsync", "curl", "ed", "perl", "zstd", "pkg-config", "libffi", "jq"]
-    build = ["bison", "bazel", "python3-minimal", "poetry-core", "sphinx"]
+    gnu = ["gnutar", "gnumake", "gnugrep", "gnused", "gawk"]
+    libs = ["attr", "acl", "gmp-with-cxx", "gmp-with-cxx-stage4", "libidn2", "libmpc", "pcre", "pcre2", "mpfr", "pcre-light", "isl", "libunistring"]
+    comp = ["gzip", "zlib", "bzip2", "xz", "unzip"]
+    utils = ["findutils", "diffutils", "patchutils"]
+    tools = ["file", "rsync", "curl", "ed", "perl", "zstd", "pkg-config", "libffi", "jq", "openssl"]
+    build = ["bison", "bazel", "cmake", "ninja", "python3-minimal", "poetry-core", "sphinx"]
     rust = ["cargo", "rust-docs", "rust-std", "cargo", "rustc", "crane-utils"]
     haskell = ["ghc"]
 
