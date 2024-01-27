@@ -46,6 +46,29 @@ uniplate-1.6.13: /nix/store/ka5s06hbpzrad83wn0q9ivc77imhq6mm-uniplate-1.6.13.tar
 patience-0.3: /nix/store/97wn7k8k562av53ryhwzsj830rwisn9r-patience-0.3.tar.gz <mirror://hackage/patience-0.3.tar.gz>
 ```
 
+- An emacs with packages:
+
+```ShellSession
+$ ndbom list github:podenv/nano-agenda.nix
+emacs-nox-29.1: /nix/store/g8xgf2qvc3mqkkygg2vmjpfhlbh6fy5w-source <https://git.savannah.gnu.org/cgit/emacs.git/snapshot/emacs-29.1.tar.gz>
+...
+org-ql-20231106.2230: /nix/store/jyxb8nmayf26y20knpac7j63yypc3xla-source <https://github.com/alphapapa/org-ql/archive/4f62ba3bd6d639b021ee9f159357b2a80d7a2f92.tar.gz>
+nano-agenda-0.3: /nix/store/r8pyzy4xqah4nfhxjwd305wd8qvs5b8s-nano-agenda-0.3.tar <https://elpa.gnu.org/packages/nano-agenda-0.3.tar https://elpa.gnu.org/packages/nano-agenda-0.3.tar.lz>
+magit-20231112.914: /nix/store/9lkz0l7q8835dph0cdj5iszphk6gpkfg-source <https://github.com/magit/magit/archive/f4ff817cb2a48f0f7887050c3be469c03a059567.tar.gz>
+magit-section-20231014.1405: /nix/store/zd6m2827fb95xf2msls2cdcq3as8vv4g-source <https://github.com/magit/magit/archive/22c99839c9fad89461412f153a290779cf3af82c.tar.gz>
+```
+
+- A dev environment:
+
+```ShellSession
+$ ndbom list github:logjuicer/logjuicer#devShell.x86_64-linux
+...
+rust-analyzer-2023-10-02: /nix/store/x0c64h1rhdxlzz894jv60qq01fdjjmkm-source <https://github.com/rust-lang/rust-analyzer/archive/2023-10-02.tar.gz>
+capnproto-1.0.1: /nix/store/mspd99q7gw6igc3rf6y3hkkas7b14jkw-source <https://github.com/capnproto/capnproto/archive/v1.0.1.tar.gz>
+cargo-watch-8.4.1: /nix/store/wsla3x0rznrxfslm0qhw4bnndwkllwll-source <https://github.com/watchexec/cargo-watch/archive/v8.4.1.tar.gz>
+wasm-pack-0.12.1: /nix/store/w5ndkqw62yl2q4bvdp4nhk59vxyd6s64-source <https://github.com/rustwasm/wasm-pack/archive/refs/tags/v0.12.1.tar.gz>
+```
+
 ## Install
 
 Install `ndbom` by running: `nix profile install github:TristanCacqueray/nix-diff-bill-of-materials`
