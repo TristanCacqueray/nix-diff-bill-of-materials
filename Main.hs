@@ -1,3 +1,6 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
+
 module Main where
 
 import Data.Attoparsec.Text.Lazy qualified
@@ -6,36 +9,31 @@ import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Data.Text.Lazy.IO qualified
+import Data.Tree qualified as Tree
 import Nix.Derivation qualified
 import Options.Applicative qualified as O
 import RIO
 import Turtle qualified
 
-data Material = Material
-    { name :: Text
-    , version :: Text
-    , src :: FilePath
-    }
-
-data Source = Source
-    { out :: FilePath
-    , url :: Text
-    }
-
-showMaterial :: Material -> Text
-showMaterial m = mconcat [m.name, "-", m.version, ": ", Text.pack m.src]
-
-showSource :: Source -> Text
-showSource s = mconcat [Text.pack s.out, ": ", s.url]
+data DrvInfo
+    = MaterialInfo
+        { name :: Text
+        , version :: Text
+        , src :: FilePath
+        }
+    | Source
+        { out :: FilePath
+        , url :: Text
+        }
 
 type Drv = Nix.Derivation.Derivation FilePath Text
 
 -- rust crate from crane does not use pname/version
-parseRustMaterial :: Drv -> Maybe Material
+parseRustMaterial :: Drv -> Maybe DrvInfo
 parseRustMaterial drv = do
     (name, version) <- getName
     src <- getSrc
-    pure Material{name, src, version}
+    pure MaterialInfo{name, src, version}
   where
     getName = do
         name <- Map.lookup "name" drv.env
@@ -53,15 +51,15 @@ parseRustMaterial drv = do
             src : _ -> pure $ Text.unpack src
             _ -> Nothing
 
-parseMaterial :: Drv -> Maybe Material
+parseMaterial :: Drv -> Maybe DrvInfo
 parseMaterial drv =
     parseRustMaterial drv <|> do
         name <- Map.lookup "pname" drv.env
         version <- Map.lookup "version" drv.env
         src <- Text.unpack <$> Map.lookup "src" drv.env
-        pure Material{name, src, version}
+        pure MaterialInfo{name, src, version}
 
-parseSource :: Drv -> Maybe Source
+parseSource :: Drv -> Maybe DrvInfo
 parseSource drv = do
     -- Question: why some (most?) urls are not using the builtin:fetch?
     -- This hack seems necessary to detect fetchFromGitHub usage.
@@ -69,60 +67,78 @@ parseSource drv = do
     url <- Map.lookup "urls" drv.env
     pure Source{out, url}
 
-newtype Visited = Visited (IORef (Set FilePath))
+data Material = Material
+    { name :: Text
+    , version :: Text
+    , url :: Maybe Text
+    }
 
-newVisited :: IO Visited
-newVisited = Visited <$> newIORef mempty
+type Materials = Tree.Forest Material
 
-isVisited :: Visited -> FilePath -> IO Bool
-isVisited (Visited ref) fp = do
-    s <- readIORef ref
-    if fp `Set.member` s
-        then pure True
-        else do
-            writeIORef ref (Set.insert fp s)
-            pure False
+showMaterial :: Int -> Material -> Text
+showMaterial depth mat =
+    mconcat
+        [Text.replicate depth " ", mat.name, " ", mat.version, " <", fromMaybe "unknown" mat.url, ">"]
 
-newtype Sources = Sources (IORef (Map FilePath Text))
+showMaterials :: Materials -> Text
+showMaterials mats = Text.unlines $ concatMap (showTree 0) mats
+  where
+    showTree :: Int -> Tree.Tree Material -> [Text]
+    showTree depth (Tree.Node mat childs) =
+        showMaterial depth mat : concatMap (showTree $ depth + 1) childs
 
-newSources :: IO Sources
-newSources = Sources <$> newIORef mempty
+-- | A list of derivation name we don't want to cover.
+-- note: this match any package, how to filter std build env?
+defaultIgnore :: Set Text
+defaultIgnore =
+    Set.fromList $ mconcat [stdenv, glib, gnu, libs, comp, utils, build, rust, haskell]
+  where
+    stdenv = ["gcc", "xgcc", "linux-headers", "glibc", "coreutils", "binutils", "patch", "patchelf", "gmp"]
+    glib = ["glibc", "glibc-locales"]
+    gnu = ["gnutar", "gnumake", "gnugrep", "gawk"]
+    libs = ["pcre2", "mpfr", "pcre-light"]
+    comp = ["gzip", "zlib", "bzip2", "xz"]
+    utils = ["rsync", "curl", "ed", "perl", "zstd", "pkg-config", "libffi", "jq"]
+    build = ["bison", "bazel", "python3-minimal", "poetry-core", "sphinx"]
+    rust = ["cargo", "rust-docs", "rust-std", "cargo", "rustc", "crane-utils"]
+    haskell = ["ghc"]
 
-registerSource :: Sources -> Source -> IO ()
-registerSource (Sources ref) src = modifyIORef' ref (Map.insert src.out src.url)
-
-lookupSource :: Sources -> FilePath -> IO (Maybe Text)
-lookupSource (Sources ref) src = Map.lookup src <$> readIORef ref
-
-type MaterialSource = (Material, Maybe Text)
-
-showMaterialSource :: MaterialSource -> Text
-showMaterialSource (mat, mUrl) = mconcat [showMaterial mat, " <", fromMaybe "unknown" mUrl, ">"]
-
-getBOM :: FilePath -> IO [MaterialSource]
+getBOM :: FilePath -> IO Materials
 getBOM root = do
-    visited <- newVisited
-    sources <- newSources
+    visited <- newIORef mempty
     let
-        go :: FilePath -> IO [MaterialSource]
-        go fp = do
-            known <- isVisited visited fp
-            if known
+        visitOnce fp act = do
+            s <- readIORef visited
+            if fp `Set.member` s
                 then pure []
                 else do
-                    drv <- readDrv fp
-                    childs <- concat <$> traverse go (Map.keys drv.inputDrvs)
-                    case (Left <$> parseMaterial drv <|> Right <$> parseSource drv) of
-                        Just (Left mat) -> do
-                            url <- lookupSource sources mat.src
-                            pure ((mat, url) : childs)
-                        Just (Right src) -> do
-                            registerSource sources src
-                            pure childs
-                        Nothing -> do
-                            -- TODO, what are those?
-                            putStrLn $ fp <> ": unknown"
-                            pure childs
+                    modifyIORef' visited $ Set.insert fp
+                    act
+
+    -- Store sources url from inputDrvs to lookup for the material
+    sources <- newIORef mempty
+    let
+        go :: FilePath -> IO Materials
+        go fp = visitOnce fp do
+            drv <- readDrv fp
+            let mDrvInfo = parseMaterial drv <|> parseSource drv
+            case mDrvInfo of
+                Just (MaterialInfo{name}) | name `Set.member` defaultIgnore -> pure mempty
+                _ -> goDrv drv mDrvInfo
+
+        goDrv drv mDrvInfo = do
+            childs <- concat <$> traverse go (Map.keys drv.inputDrvs)
+            case mDrvInfo of
+                Just (MaterialInfo{name, version, src}) -> do
+                    url <- Map.lookup src <$> readIORef sources
+                    pure [Tree.Node Material{name, version, url} childs]
+                Just (Source{out, url}) -> do
+                    modifyIORef' sources $ Map.insert out url
+                    pure childs
+                Nothing -> do
+                    -- Question: how to filter non package derivation like bootstrap or build env wrapper?
+                    -- putStrLn $ fp <> ": unknown"
+                    pure childs
     go root
 
 readDrv :: FilePath -> IO Drv
@@ -142,7 +158,7 @@ data Options = Options
     , target :: Text
     }
 
-data Action = List
+data Action = List | Count
 
 parserInfo :: O.ParserInfo Options
 parserInfo =
@@ -152,9 +168,10 @@ parserInfo =
   where
     parseOptions =
         pure Options
-            <*> O.subparser (listCommand)
+            <*> O.subparser (listCommand <> countCommand)
             <*> O.strArgument (O.metavar "INSTALLABLE")
     listCommand = O.command "list" (O.info (pure List) (O.progDesc "List the materials"))
+    countCommand = O.command "count" (O.info (pure Count) (O.progDesc "Count the materials"))
 
 readProc :: Text -> [Text] -> Turtle.Shell Text
 readProc cmd args = Turtle.lineToText <$> Turtle.inproc cmd args mempty
@@ -166,4 +183,5 @@ main = do
     mats <- getBOM =<< installableToDrvPath options.target
 
     case options.action of
-        List -> traverse_ (Text.putStrLn . showMaterialSource) mats
+        List -> Text.putStrLn $ showMaterials mats
+        Count -> print (sum $ length <$> mats)
