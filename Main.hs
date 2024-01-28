@@ -70,6 +70,7 @@ parseSource drv = do
 data Material = Material
     { name :: Text
     , version :: Text
+    , src :: FilePath
     , url :: Maybe Text
     }
 
@@ -132,7 +133,7 @@ getBOM root = do
             case mDrvInfo of
                 Just (MaterialInfo{name, version, src}) -> do
                     url <- Map.lookup src <$> readIORef sources
-                    pure [Tree.Node Material{name, version, url} childs]
+                    pure [Tree.Node Material{name, version, url, src} childs]
                 Just (Source{out, url}) -> do
                     modifyIORef' sources $ Map.insert out url
                     pure childs
@@ -154,12 +155,35 @@ installableToDrvPath installable = do
     Turtle.procs "nix" ["build", installable] mempty
     Text.unpack <$> Turtle.single (readProc "nix" ["path-info", "--derivation", installable])
 
+data Diff
+    = Added Material
+    | Modified Material Material
+
+diffMaterials :: Materials -> Materials -> [Diff]
+diffMaterials src dst = Map.foldMapWithKey mkDiff dstMap
+  where
+    mkDiff package dstMat = case Map.lookup package srcMap of
+        Nothing -> [Added dstMat]
+        Just srcMat
+            | dstMat.src == srcMat.src -> []
+            | otherwise -> [Modified srcMat dstMat]
+    srcMap = toMap src
+    dstMap = toMap dst
+    toMap mats = Map.fromList $ map (\mat -> (mat.name, mat)) $ concatMap Tree.flatten mats
+
+renderDiff :: [Diff] -> IO ()
+renderDiff = traverse_ go
+  where
+    go = \case
+        Added mat -> Text.putStrLn $ mconcat ["Added: ", showMaterial 0 mat]
+        Modified smat dmat -> Text.putStrLn $ mconcat ["Modified ", smat.name, ": ", smat.version, " -> ", dmat.version]
+
 data Options = Options
     { action :: Action
     , target :: Text
     }
 
-data Action = List | Count
+data Action = List | Count | Diff Text
 
 parserInfo :: O.ParserInfo Options
 parserInfo =
@@ -169,20 +193,27 @@ parserInfo =
   where
     parseOptions =
         pure Options
-            <*> O.subparser (listCommand <> countCommand)
+            <*> O.subparser (listCommand <> countCommand <> diffCommand)
             <*> O.strArgument (O.metavar "INSTALLABLE")
     listCommand = O.command "list" (O.info (pure List) (O.progDesc "List the materials"))
     countCommand = O.command "count" (O.info (pure Count) (O.progDesc "Count the materials"))
+    diffCommand = O.command "diff" (O.info (Diff <$> O.strArgument (O.metavar "INSTALLABLE")) (O.progDesc "Diff with"))
 
 readProc :: Text -> [Text] -> Turtle.Shell Text
 readProc cmd args = Turtle.lineToText <$> Turtle.inproc cmd args mempty
+
+getMats :: Text -> IO Materials
+getMats target = getBOM =<< installableToDrvPath target
 
 main :: IO ()
 main = do
     options <- O.execParser parserInfo
 
-    mats <- getBOM =<< installableToDrvPath options.target
+    mats <- getMats options.target
 
     case options.action of
         List -> Text.putStrLn $ showMaterials mats
         Count -> print (sum $ length <$> mats)
+        Diff target -> do
+            omats <- getMats target
+            renderDiff (diffMaterials omats mats)
