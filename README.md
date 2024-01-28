@@ -10,74 +10,99 @@ The goal is to show the list of every LOC added after running
 
 Here are a few demos:
 
-- A nixpkgs package:
+- Compare two versions:
+
+```ShellSession
+$ nix flake update
+$ ndbom diff github:TristanCacqueray/nix-diff-bill-of-materials#devShell.x86_64-linux .#devShell.x86_64-linux
+[+] Modified ansi-terminal: 0.11.5 -> 1.0.2
+diff -rup ansi-terminal-0.11.5/CHANGELOG.md ansi-terminal-1.0.2/CHANGELOG.md
+--- ansi-terminal-0.11.5/CHANGELOG.md	                                  2023-03-20 16:27:58.000000000 -0400
++++ ansi-terminal-1.0.2/CHANGELOG.md	                                  2024-01-13 12:23:51.000000000 -0500
+@@ -1,6 +1,41 @@
+ Changes
+ =======
+
++Version 1.0.2
++-------------
++
++* On Windows, fix linker error about a duplicate symbol `castUINTPtrToPtr`.
++
+```
+
+- List a nixpkgs package sources:
 
 ```ShellSession
 $ ndbom list nixpkgs/nixos-23.11#mold
-mold-2.3.3: /nix/store/mgnc0zrfgzxmpbgzbjri6ma2855jiqp4-source <https://github.com/rui314/mold/archive/v2.3.3.tar.gz>
-...
-mimalloc-2.1.2: /nix/store/c58kvgdm0ykzkq8318f7by64isbbpyjd-source <https://github.com/microsoft/mimalloc/archive/v2.1.2.tar.gz>
+mold 2.3.3 <https://github.com/rui314/mold/archive/v2.3.3.tar.gz>
+  tbb 2021.8.0 <https://github.com/oneapi-src/oneTBB/archive/v2021.8.0.tar.gz>
+  mimalloc 2.1.2 <https://github.com/microsoft/mimalloc/archive/v2.1.2.tar.gz>
 ```
 
-- A rust application built with crane:
+- List a rust application sources built with crane:
 
 ```ShellSession
 $ ndbom list github:logjuicer/logjuicer
-logjuicer-cli-deps-0.9.6: /nix/store/5dlpmvlj8nmcvygk346fmsw7s1i0arcf-source <unknown>
-...
-sprs-0.11.1: /nix/store/cly8f0899l67k60wcv3ck8jvaww1r2b6-sprs-0.11.1 <https://crates.io/api/v1/crates/sprs/0.11.1/download>
-web-sys-0.3.64: /nix/store/fk4kp403rblhpxs4jbkjs6p8iaz8hnfw-web-sys-0.3.64 <https://crates.io/api/v1/crates/web-sys/0.3.64/download>
-syn-2.0.28: /nix/store/y2n8w1wrkaccf43hj03i0fqhb0bm1vzm-syn-2.0.28 <https://crates.io/api/v1/crates/syn/2.0.28/download>
-tokio-stream-0.1.14: /nix/store/sb8vdsbprwc4ssfgk4flhmwngnrlxndn-tokio-stream-0.1.14 <https://crates.io/api/v1/crates/tokio-stream/0.1.14/download>
+logjuicer-cli 0.9.6 <unknown>
+  logjuicer-cli-deps 0.9.6 <unknown>
+    sqlx-macros 0.7.2 <https://crates.io/api/v1/crates/sqlx-macros/0.7.2/download>
+    sprs-0.11.1: /nix/store/cly8f0899l67k60wcv3ck8jvaww1r2b6-sprs-0.11.1 <https://crates.io/api/v1/crates/sprs/0.11.1/download>
+    web-sys-0.3.64: /nix/store/fk4kp403rblhpxs4jbkjs6p8iaz8hnfw-web-sys-0.3.64 <https://crates.io/api/v1/crates/web-sys/0.3.64/download>
+    tokio-stream-0.1.14: /nix/store/sb8vdsbprwc4ssfgk4flhmwngnrlxndn-tokio-stream-0.1.14 <https://crates.io/api/v1/crates/tokio-stream/0.1.14/download>
 ```
 
-> Note that the flake source input does not have an url (marked unknown) because it is provided by nix
+> Note that some sources are unknown, that's because they are provided by the flake self.
 
-- A haskell application built with nixpkgs:
+- List a haskell application sources built with nixpkgs:
 
 ```ShellSession
 $ ndbom list github:Gabriel439/nix-diff
-nix-diff-1.0.19: /nix/store/l3jrgrjkibips68aqz6ic87w93ywnira-fkrsjynjqpr8ch1dy5lqs7af3025kjba-source <unknown>
-...
-unliftio-core-0.2.0.1: /nix/store/0ydddavs1dqvbbk7xncy1rbhqvlwbfcx-unliftio-core-0.2.0.1.tar.gz <mirror://hackage/unliftio-core-0.2.0.1.tar.gz>
-witherable-0.4.2: /nix/store/vkbllbpcamkghfvpdkdjb441aicc3zp8-witherable-0.4.2.tar.gz <mirror://hackage/witherable-0.4.2.tar.gz>
-base16-bytestring-1.0.2.0: /nix/store/8b8f6aiqazxwgrdznnzii2zjvjmzldnz-base16-bytestring-1.0.2.0.tar.gz <mirror://hackage/base16-bytestring-1.0.2.0.tar.gz>
-uniplate-1.6.13: /nix/store/ka5s06hbpzrad83wn0q9ivc77imhq6mm-uniplate-1.6.13.tar.gz <mirror://hackage/uniplate-1.6.13.tar.gz>
-patience-0.3: /nix/store/97wn7k8k562av53ryhwzsj830rwisn9r-patience-0.3.tar.gz <mirror://hackage/patience-0.3.tar.gz>
+nix-diff 1.0.19 <unknown>
+  nix-derivation 1.1.2 <mirror://hackage/nix-derivation-1.1.2.tar.gz>
+    QuickCheck 2.14.2 <mirror://hackage/QuickCheck-2.14.2.tar.gz>
+      splitmix 0.1.0.4 <mirror://hackage/splitmix-0.1.0.4.tar.gz>
+        hscolour 1.24.4 <mirror://hackage/hscolour-1.24.4.tar.gz>
+      random 1.2.1.1 <mirror://hackage/random-1.2.1.1.tar.gz>
+    attoparsec 0.14.4 <mirror://hackage/attoparsec-0.14.4.tar.gz>
 ```
 
-- An emacs with packages:
+- List an emacs with packages:
 
 ```ShellSession
 $ ndbom list github:podenv/nano-agenda.nix
-emacs-nox-29.1: /nix/store/g8xgf2qvc3mqkkygg2vmjpfhlbh6fy5w-source <https://git.savannah.gnu.org/cgit/emacs.git/snapshot/emacs-29.1.tar.gz>
-...
-org-ql-20231106.2230: /nix/store/jyxb8nmayf26y20knpac7j63yypc3xla-source <https://github.com/alphapapa/org-ql/archive/4f62ba3bd6d639b021ee9f159357b2a80d7a2f92.tar.gz>
-nano-agenda-0.3: /nix/store/r8pyzy4xqah4nfhxjwd305wd8qvs5b8s-nano-agenda-0.3.tar <https://elpa.gnu.org/packages/nano-agenda-0.3.tar https://elpa.gnu.org/packages/nano-agenda-0.3.tar.lz>
-magit-20231112.914: /nix/store/9lkz0l7q8835dph0cdj5iszphk6gpkfg-source <https://github.com/magit/magit/archive/f4ff817cb2a48f0f7887050c3be469c03a059567.tar.gz>
-magit-section-20231014.1405: /nix/store/zd6m2827fb95xf2msls2cdcq3as8vv4g-source <https://github.com/magit/magit/archive/22c99839c9fad89461412f153a290779cf3af82c.tar.gz>
+markdown-mode 20231028.853 <https://github.com/jrblevin/markdown-mode/archive/b1a862f0165b7bafe0f874738a55be1b1720dd7d.tar.gz>
+org-ql 20231106.2230 <https://github.com/alphapapa/org-ql/archive/4f62ba3bd6d639b021ee9f159357b2a80d7a2f92.tar.gz>
+  s 20220902.1511 <https://github.com/magnars/s.el/archive/b4b8c03fcef316a27f75633fe4bb990aeff6e705.tar.gz>
+  transient 20231112.923 <https://github.com/magit/transient/archive/3cd1de1695084df089cc90cff89b32dfd6ca5a0a.tar.gz>
+    compat 29.1.4.4 <https://elpa.gnu.org/packages/compat-29.1.4.4.tar https://elpa.gnu.org/packages/compat-29.1.4.4.tar.lz>
+magit 20231112.914 <https://github.com/magit/magit/archive/f4ff817cb2a48f0f7887050c3be469c03a059567.tar.gz>
+  magit-section 20231014.1405 <https://github.com/magit/magit/archive/22c99839c9fad89461412f153a290779cf3af82c.tar.gz>
 ```
 
-- A dev environment:
+- List a dev environment:
 
 ```ShellSession
 $ ndbom list github:logjuicer/logjuicer#devShell.x86_64-linux
-...
-rust-analyzer-2023-10-02: /nix/store/x0c64h1rhdxlzz894jv60qq01fdjjmkm-source <https://github.com/rust-lang/rust-analyzer/archive/2023-10-02.tar.gz>
-capnproto-1.0.1: /nix/store/mspd99q7gw6igc3rf6y3hkkas7b14jkw-source <https://github.com/capnproto/capnproto/archive/v1.0.1.tar.gz>
-cargo-watch-8.4.1: /nix/store/wsla3x0rznrxfslm0qhw4bnndwkllwll-source <https://github.com/watchexec/cargo-watch/archive/v8.4.1.tar.gz>
-wasm-pack-0.12.1: /nix/store/w5ndkqw62yl2q4bvdp4nhk59vxyd6s64-source <https://github.com/rustwasm/wasm-pack/archive/refs/tags/v0.12.1.tar.gz>
+trunk 0.17.2 <https://github.com/thedodd/trunk/archive/v0.17.2.tar.gz>
+  cargo-auditable 0.6.1 <https://github.com/rust-secure-code/cargo-auditable/archive/v0.6.1.tar.gz>
+rust-analyzer 2023-10-02 <https://github.com/rust-lang/rust-analyzer/archive/2023-10-02.tar.gz>
+capnproto 1.0.1 <https://github.com/capnproto/capnproto/archive/v1.0.1.tar.gz>
+cargo-watch 8.4.1 <https://github.com/watchexec/cargo-watch/archive/v8.4.1.tar.gz>
+wasm-pack 0.12.1 <https://github.com/rustwasm/wasm-pack/archive/refs/tags/v0.12.1.tar.gz>
 ```
 
 ## Install
 
 Install `ndbom` by running: `nix profile install github:TristanCacqueray/nix-diff-bill-of-materials`
 
+
 ## Roadmap
 
-Implement the diff command to compare two derivations:
-When two inputs have the same name, perform a diff on the sources.
+- [x] Show source diff
+- [ ] Support custom exclude/include list
+
 
 ## Notes
 
-There got to be a better way to do this, that's just an investigation.
+Matching sources with their package name is surprisingly complicated, and this implementation may not work for every installables.
+If you know a better way to do this, please let me know!

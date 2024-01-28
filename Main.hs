@@ -18,6 +18,9 @@ import Data.Tree qualified as Tree
 import Nix.Derivation qualified
 import Options.Applicative qualified as O
 import RIO
+import RIO.Directory qualified as RIO
+import RIO.FilePath ((</>))
+import RIO.FilePath qualified as RIO
 import Turtle qualified
 
 -------------------------------------------------------------------------------
@@ -97,7 +100,8 @@ data Material = Material
     { name :: Text
     , version :: Text
     , src :: FilePath
-    , url :: Maybe Text
+    , srcInfo :: Maybe (Text, FilePath)
+    , fp :: FilePath
     }
 
 type Materials = Tree.Forest Material
@@ -105,7 +109,7 @@ type Materials = Tree.Forest Material
 showMaterial :: Int -> Material -> Text
 showMaterial depth mat =
     mconcat
-        [Text.replicate (depth * 2) " ", mat.name, " ", mat.version, " <", fromMaybe "unknown" mat.url, ">"]
+        [Text.replicate (depth * 2) " ", mat.name, " ", mat.version, " <", fromMaybe "unknown" (fst <$> mat.srcInfo), ">"]
 
 showMaterials :: Materials -> Text
 showMaterials mats = Text.unlines $ concatMap (showTree 0) mats
@@ -135,10 +139,10 @@ getBOM root = do
             childs <- concat <$> traverse go (Map.keys drv.inputDrvs)
             case parseDrvInfo drv of
                 Just (MaterialInfo{name, version, src}) -> do
-                    url <- Map.lookup src <$> readIORef sources
-                    pure [Tree.Node Material{name, version, url, src} childs]
+                    srcInfo <- Map.lookup src <$> readIORef sources
+                    pure [Tree.Node Material{name, version, srcInfo, src, fp} childs]
                 Just (Source{out, url}) -> do
-                    modifyIORef' sources $ Map.insert out url
+                    modifyIORef' sources $ Map.insert out (url, fp)
                     pure childs
                 Nothing -> do
                     -- Question: how to filter non package derivation like bootstrap or build env wrapper?
@@ -164,7 +168,7 @@ defaultIgnore :: Set Text
 defaultIgnore =
     Set.fromList $ mconcat [stdenv, glib, gnu, libs, tools, comp, utils, build, rust, haskell]
   where
-    stdenv = ["gcc", "xgcc", "clang", "llvm", "compiler-rt-libc", "linux-headers", "glibc", "coreutils", "binutils", "patch", "patchelf", "gmp"]
+    stdenv = ["gcc", "xgcc", "clang", "llvm", "compiler-rt-libc", "linux", "linux-headers", "glibc", "coreutils", "binutils", "patch", "patchelf", "gmp"]
     glib = ["glibc", "glibc-locales"]
     gnu = ["gnutar", "gnumake", "gnugrep", "gnused", "gawk"]
     libs = ["attr", "acl", "gmp-with-cxx", "gmp-with-cxx-stage4", "libidn2", "libmpc", "pcre", "pcre2", "mpfr", "pcre-light", "isl", "libunistring"]
@@ -199,8 +203,49 @@ renderDiff :: [Diff] -> IO ()
 renderDiff = traverse_ go
   where
     go = \case
-        Added mat -> Text.putStrLn $ mconcat ["Added: ", showMaterial 0 mat]
-        Modified smat dmat -> Text.putStrLn $ mconcat ["Modified ", smat.name, ": ", smat.version, " -> ", dmat.version]
+        Added mat -> Text.putStrLn $ mconcat ["[+] Added: ", showMaterial 0 mat]
+        Modified smat dmat -> do
+            Text.putStrLn $ mconcat ["[+] Modified ", smat.name, ": ", smat.version, " -> ", dmat.version]
+            runDiff smat dmat
+
+    runDiff smat dmat = do
+        traverse getMaterialSource [smat, dmat] >>= \case
+            [Just src, Just dst] -> do
+                void $ Turtle.proc "diff" ["-rup", Text.pack src, Text.pack dst] mempty
+            _ -> putStrLn $ "Failed to get source for " <> smat.src <> " " <> dmat.src
+
+getMaterialSource :: Material -> IO (Maybe FilePath)
+getMaterialSource mat = go True
+  where
+    go doBuild =
+        RIO.doesPathExist mat.src >>= \case
+            True ->
+                RIO.doesDirectoryExist mat.src >>= \case
+                    True -> pure $ Just mat.src
+                    -- The source is needs to be unpacked
+                    False -> doExtract
+            -- The source does not exist, let's try to build it
+            False
+                | doBuild -> case mat.srcInfo of
+                    -- We don't have the drv file to do the build.
+                    Nothing -> pure Nothing
+                    Just (_, src) -> do
+                        Turtle.procs "nix" ["build", Text.pack src <> "^*"] mempty
+                        go False
+                | otherwise ->
+                    -- We tried to build but it didn't produce the expected path
+                    pure Nothing
+
+    doExtract = do
+        fp <- RIO.getTemporaryDirectory
+        let dst = fp </> "ndbom" </> RIO.takeBaseName mat.src
+        unlessM (RIO.doesDirectoryExist dst) do
+            RIO.createDirectoryIfMissing True dst
+            Turtle.procs "tar" ["-xf", Text.pack mat.src, "-C", Text.pack dst] mempty
+        RIO.listDirectory dst >>= \case
+            [] -> pure Nothing
+            [root] -> pure $ Just $ dst </> root
+            _ -> pure $ Just dst
 
 -------------------------------------------------------------------------------
 -- CLI entry point
