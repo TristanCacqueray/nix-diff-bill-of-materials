@@ -1,16 +1,19 @@
-cabal-version:      3.0
-name:               ndbom
-version:            0.1
+cabal-version:   3.0
+name:            ndbom
+version:         0.1
+
 -- synopsis:
 -- description:
-license:            MIT
-license-file:       LICENSE
-author:             Tristan Cacqueray
-maintainer:         tdecacqu@redhat.com
+license:         MIT
+license-file:    LICENSE
+author:          Tristan Cacqueray
+maintainer:      tdecacqu@redhat.com
+
 -- copyright:
-category:           System
-build-type:         Simple
-extra-doc-files:    CHANGELOG.md
+category:        System
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
 -- extra-source-files:
 
 common executable
@@ -25,22 +28,33 @@ common common
 
   default-extensions:
     BlockArguments
+    DataKinds
+    DerivingStrategies
+    DuplicateRecordFields
     ImportQualifiedPost
     LambdaCase
+    NoFieldSelectors
     OverloadedRecordDot
     OverloadedStrings
     PartialTypeSignatures
+    QuasiQuotes
     StrictData
     ViewPatterns
-    DerivingStrategies
-    QuasiQuotes
-    DataKinds
 
 executable ndbom
-    import:         common, executable
-    main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
-    build-depends:    aeson, base, turtle, optparse-applicative, rio, text, foldl, nix-derivation, attoparsec, containers
-    hs-source-dirs:   .
-    default-language: GHC2021
+  import:           common, executable
+  main-is:          Main.hs
+  build-depends:
+    , aeson
+    , attoparsec
+    , base
+    , containers
+    , foldl
+    , nix-derivation
+    , optparse-applicative
+    , rio
+    , text
+    , turtle
+
+  hs-source-dirs:   .
+  default-language: GHC2021
