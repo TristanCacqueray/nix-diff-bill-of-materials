@@ -98,8 +98,10 @@ Install `ndbom` by running: `nix profile install github:TristanCacqueray/nix-dif
 
 ## Roadmap
 
-- [x] Show source diff
-- [ ] Support custom exclude/include list
+- [x] Show source diff.
+- [ ] Filter the materials using custom exclude/include list, for example to focus on package registry like crates.io.
+- [ ] Filter the diff, for example to highlight CHANGELOGs.
+- [ ] Index the diff, for example in quickwit to show statistics like number of LOC added.
 
 
 ## Notes
